@@ -1,11 +1,24 @@
 #ifndef FB_CPP_RESULT_HPP
 #define FB_CPP_RESULT_HPP
 #include <type_traits>
+#include <concepts>
 #include <utility>
 #include <variant>
 #include <functional>
+#include <stdexcept>
 
 namespace fb {
+	namespace result_detail {
+		template <typename T, template <typename...> typename U>
+		struct is_template_of : std::false_type {};
+
+		template <template <typename...> typename U, typename... Us>
+		struct is_template_of<U<Us...>, U> : std::true_type {};
+
+		template <typename T, template <typename...> typename U>
+		concept template_of = is_template_of<T, U>::value;
+	}
+
 	template <typename E>
 	class error {
 	public:
@@ -71,6 +84,12 @@ namespace fb {
 	constexpr error<E> make_error(Args&&... args) {
 		return {std::in_place_t{}, std::forward<Args&&>(args)...};
 	}
+
+	struct bad_result_access : public std::runtime_error {
+		bad_result_access(char const* what) :
+			std::runtime_error{what}
+		{}
+	};
 
 	template <typename V, typename E>
 	class result {
@@ -170,32 +189,105 @@ namespace fb {
 			return has_val();
 		}
 
-		constexpr value_type& val() & { return std::get<0>(m_value); }
-		constexpr value_type&& val() && { return std::move(std::get<0>(m_value)); }
-		constexpr value_type const& val() const& { return std::get<0>(m_value); }
-		constexpr value_type const&& val() const&& { return std::move(std::get<0>(m_value)); }
+		constexpr value_type& operator*() & {
+			if (!has_val()) {
+				throw bad_result_access{"missing value"};
+			}
 
-		template <typename F>
-		constexpr value_type val_or(F&& f) {
+			return std::get<0>(m_value);
+		}
+
+		constexpr value_type&& operator*() && {
+			if (!has_val()) {
+				throw bad_result_access{"missing value"};
+			}
+
+			return std::move(std::get<0>(m_value));
+		}
+
+		constexpr value_type const& operator*() const& {
+			if (!has_val()) {
+				throw bad_result_access{"missing value"};
+			}
+
+			return std::get<0>(m_value);
+		}
+
+		constexpr value_type const&& operator*() const&& {
+			if (!has_val()) {
+				throw bad_result_access{"missing value"};
+			}
+
+			return std::move(std::get<0>(m_value));
+		}
+
+		constexpr value_type* operator->() {
+			if (!has_val()) {
+				throw bad_result_access{"missing value"};
+			}
+
+			return std::addressof(**this);
+		}
+
+		constexpr value_type const* operator->() const {
+			if (!has_val()) {
+				throw bad_result_access{"missing value"};
+			}
+
+			return std::addressof(**this);
+		}
+
+		template <typename F> requires requires(F&& f, value_type&& v) {{std::invoke(f, v)} -> std::convertible_to<value_type>;}
+		constexpr result& fmap(F&& f) noexcept(std::is_nothrow_invocable_v<F&&, value_type>) {
 			if (has_val()) {
-				return val();
+				**this = std::invoke(f, **this);
+			}
+
+			return *this;
+		}
+
+		template <typename F> requires requires(F&& f, value_type&& v) {
+			{std::invoke(f, v)} -> result_detail::template_of<result>;
+			requires std::same_as<error_type, typename std::invoke_result_t<F&&, value_type&&>::error_type>;
+		}
+		constexpr std::invoke_result_t<F&&, value_type&&> bind(F&& f) {
+			if (has_val()) {
+				return std::invoke(f, **this);
 			} else {
-				return std::invoke(std::forward<F&&>(f));
+				return make_error(std::move(err()));
 			}
 		}
 
-		constexpr error_type& err() & { return std::get<1>(m_value); }
-		constexpr error_type&& err() && { return std::move(std::get<1>(m_value)); }
-		constexpr error_type const& err() const& { return std::get<1>(m_value); }
-		constexpr error_type const&& err() const&& { return std::move(std::get<1>(m_value)); }
-
-		template <typename F>
-		constexpr error_type err_or(F&& f) {
-			if (has_err()) {
-				return err();
-			} else {
-				return std::invoke(std::forward<F&&>(f));
+		constexpr error_type& err() & {
+			if (!has_err()) {
+				throw bad_result_access{"missing error"};
 			}
+
+			return std::get<1>(m_value);
+		}
+
+		constexpr error_type&& err() && {
+			if (!has_err()) {
+				throw bad_result_access{"missing error"};
+			}
+
+			return std::move(std::get<1>(m_value));
+		}
+
+		constexpr error_type const& err() const& {
+			if (!has_err()) {
+				throw bad_result_access{"missing error"};
+			}
+
+			return std::get<1>(m_value);
+		}
+
+		constexpr error_type const&& err() const&& {
+			if (!has_err()) {
+				throw bad_result_access{"missing error"};
+			}
+
+			return std::move(std::get<1>(m_value));
 		}
 	};
 }
