@@ -3,7 +3,7 @@
 #include <exception>
 #include <stdexcept>
 #include <iostream>
-//#include "util/result.hpp"
+#include "fb/result.hpp"
 
 template <typename T, typename... Ts>
 constexpr auto make_array(Ts&&... ts) {
@@ -13,6 +13,10 @@ constexpr auto make_array(Ts&&... ts) {
 constexpr auto tests = make_array<void(*)()>(
 	[]{
 		throw std::runtime_error{"bleh"};
+	},
+
+	[]{
+
 	}
 );
 
