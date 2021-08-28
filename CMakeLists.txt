@@ -11,9 +11,15 @@ execute_process(COMMAND git describe --tags --abbrev=0
 		OUTPUT_VARIABLE  _TAG
 		OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+if(_RET)
+	message(FATAL_ERROR "failed to get git tag")
+endif()
+
 project(cpp-result
 	LANGUAGES CXX
 	VERSION "${_TAG}")
 
 add_subdirectory(src)
+
+include(CTest)
 add_subdirectory(test)

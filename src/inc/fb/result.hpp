@@ -140,34 +140,40 @@ namespace fb {
 		constexpr result& operator=(result&&) = default;
 
 		constexpr result& operator=(value_type const& v) {
-			m_value.emplace<0>(v);
+			m_value.template emplace<0>(v);
 			return *this;
 		}
 
 		constexpr result& operator=(value_type&& v) {
-			m_value.emplace<0, decltype(v)>(std::move(v));
+			m_value.template emplace<0>(std::move(v));
 			return *this;
 		}
-		
+
+		template <typename U>
+		constexpr result& operator=(U&& u) {
+			m_value.template emplace<0>(std::forward<U&&>(u));
+			return *this;
+		}
+
 		constexpr result& operator=(error<error_type> const& e) {
-			m_value.emplace<1>(*e());
+			m_value.template emplace<1>(*e());
 			return *this;
 		}
 
 		constexpr result& operator=(error<error_type>&& e) {
-			m_value.emplace<1>(std::move(*e()));
+			m_value.template emplace<1>(std::move(*e()));
 			return *this;
 		}
 
 		template <typename U>
 		constexpr result& operator=(error<U> const& e) {
-			m_value.emplace<1>(*e());
+			m_value.template emplace<1>(*e());
 			return *this;
 		}
 
 		template <typename U>
 		constexpr result& operator=(error<U>&& e) {
-			m_value.emplace<1>(std::move(*e()));
+			m_value.template emplace<1>(std::move(*e()));
 			return *this;
 		}
 
