@@ -64,10 +64,10 @@ namespace fb {
 			return *this;
 		}
 
-		error_type& get() & { return m_err; }
-		error_type&& get() && { return std::move(m_err); }
-		error_type const& get() const& { return m_err; }
-		error_type const&& get() const&& { return std::move(m_err); }
+		constexpr error_type& operator*() & { return m_err; }
+		constexpr error_type&& operator*() && { return std::move(m_err); }
+		constexpr error_type const& operator*() const& { return m_err; }
+		constexpr error_type const&& operator*() const&& { return std::move(m_err); }
 
 		friend void swap(error& e1, error& e2) {
 			using std::swap;
@@ -119,21 +119,21 @@ namespace fb {
 		{}
 
 		constexpr result(error<error_type> const& e) :
-			m_value{std::in_place_index_t<1>{}, e.get()}
+			m_value{std::in_place_index_t<1>{}, *e}
 		{}
 
 		constexpr result(error<error_type>&& e) :
-			m_value{std::in_place_index_t<1>{}, std::move(e.get())}
+			m_value{std::in_place_index_t<1>{}, std::move(*e)}
 		{}
 
 		template <typename U>
 		constexpr result(error<U> const& e) :
-			m_value{std::in_place_index_t<1>{}, e.get()}
+			m_value{std::in_place_index_t<1>{}, *e}
 		{}
 
 		template <typename U>
 		constexpr result(error<U>&& e) :
-			m_value{std::in_place_index_t<1>{}, std::move(e.get())}
+			m_value{std::in_place_index_t<1>{}, std::move(*e)}
 		{}
 
 		constexpr result& operator=(result const&) = default;
@@ -145,35 +145,29 @@ namespace fb {
 		}
 
 		constexpr result& operator=(value_type&& v) {
-			m_value.emplace<0>(std::move(v));
+			m_value.emplace<0, decltype(v)>(std::move(v));
 			return *this;
 		}
-
-		template <typename U>
-		constexpr result& operator=(U&& u) {
-			m_value.emplace<0>(std::forward<U&&>(u));
-			return *this;
-		}
-
+		
 		constexpr result& operator=(error<error_type> const& e) {
-			m_value.emplace<1>(e.get());
+			m_value.emplace<1>(*e());
 			return *this;
 		}
 
 		constexpr result& operator=(error<error_type>&& e) {
-			m_value.emplace<1>(std::move(e.get()));
+			m_value.emplace<1>(std::move(*e()));
 			return *this;
 		}
 
 		template <typename U>
 		constexpr result& operator=(error<U> const& e) {
-			m_value.emplace<1>(e.get());
+			m_value.emplace<1>(*e());
 			return *this;
 		}
 
 		template <typename U>
 		constexpr result& operator=(error<U>&& e) {
-			m_value.emplace<1>(std::move(e.get()));
+			m_value.emplace<1>(std::move(*e()));
 			return *this;
 		}
 

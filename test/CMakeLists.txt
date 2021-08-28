@@ -6,7 +6,7 @@ endif()
 
 file(GLOB ALL_SRC "*.cpp")
 
-foreach(PATH "${ALL_SRC}")
+foreach(PATH ${ALL_SRC})
 	string(REGEX REPLACE ".*[\\/](.*)\.cpp" "\\1" PATH_NAME "${PATH}")
 	set(NAME "${PROJECT_NAME}-test-${PATH_NAME}")
 

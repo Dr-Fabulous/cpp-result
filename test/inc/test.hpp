@@ -1,31 +1,45 @@
 #ifndef FB_CPP_RESULT_TEST_HPP
 #define FB_CPP_RESULT_TEST_HPP
-#include <exception>
-#include <stdexcept>
-#include <array>
+#include <concepts>
+#include <utility>
 #include <functional>
+#include <tuple>
+#include <source_location>
 #include <iostream>
 
-namespace fb::test {
-	template <typename... Ts>
-	constexpr auto make_tests(Ts&&... ts) {
-		return std::array<void(*)(), sizeof...(Ts)>{std::forward<Ts&&>(ts)...};
+namespace test {
+	struct failed_assertion {
+		std::source_location loc;
+	};
+
+	void assert(bool b, std::source_location loc = std::source_location::current()) {
+		if (!b) {
+			throw failed_assertion{loc};
+		}
 	}
 
-	int run(auto&& tests) {
+	template <std::invocable<>... Fs>
+	int run(std::tuple<Fs...> const& t) {
 		try {
-			for (const auto& t : tests) {
-				std::invoke(t);
-			}
-		} catch(std::exception& e) {
-			std::cout << "\033[1;31mERROR\033[0m: " << e.what() << "\n";
+			std::apply([](auto&&... fs) {
+				(std::invoke(fs), ...);
+			}, t);
+		} catch(failed_assertion& a) {
+			std::cout << "\033[1;31mERROR\033[0m: failure at "
+				  << a.loc.file_name()
+				  << ":"
+				  << a.loc.line()
+				  << " in "
+				  << a.loc.function_name()
+				  <<  "\n";
+
 			return 1;
 		} catch(...) {
 			std::cerr << "\033[1;31mERROR\033[0m: unknown exception\n";
 			return 2;
 		}
 
-		return 0;	
+		return 0;
 	}
 }
 
