@@ -82,7 +82,7 @@ namespace fb {
 
 	template <typename E, typename... Args>
 	constexpr error<E> make_error(Args&&... args) {
-		return {std::in_place_t{}, std::forward<Args&&>(args)...};
+		return {std::in_place, std::forward<Args&&>(args)...};
 	}
 
 	struct bad_result_access : public std::runtime_error {
@@ -106,34 +106,34 @@ namespace fb {
 		constexpr result(result&&) = default;
 
 		constexpr result(value_type const& v) :
-			m_value{std::in_place_index_t<0>{}, v}
+			m_value{std::in_place_index<0>, v}
 		{}
 
 		constexpr result(value_type&& v) :
-			m_value{std::in_place_index_t<0>{}, std::move(v)}
+			m_value{std::in_place_index<0>, std::move(v)}
 		{}
 
 		template <typename U>
 		constexpr result(U&& u) :
-			m_value{std::in_place_index_t<0>{}, std::forward<U&&>(u)}
+			m_value{std::in_place_index<0>, std::forward<U&&>(u)}
 		{}
 
 		constexpr result(error<error_type> const& e) :
-			m_value{std::in_place_index_t<1>{}, *e}
+			m_value{std::in_place_index<1>, *e}
 		{}
 
 		constexpr result(error<error_type>&& e) :
-			m_value{std::in_place_index_t<1>{}, std::move(*e)}
+			m_value{std::in_place_index<1>, std::move(*e)}
 		{}
 
 		template <typename U>
 		constexpr result(error<U> const& e) :
-			m_value{std::in_place_index_t<1>{}, *e}
+			m_value{std::in_place_index<1>, *e}
 		{}
 
 		template <typename U>
 		constexpr result(error<U>&& e) :
-			m_value{std::in_place_index_t<1>{}, std::move(*e)}
+			m_value{std::in_place_index<1>, std::move(*e)}
 		{}
 
 		constexpr result& operator=(result const&) = default;
@@ -237,27 +237,6 @@ namespace fb {
 			return std::addressof(**this);
 		}
 
-		template <typename F> requires requires(F&& f, value_type&& v) {{std::invoke(f, v)} -> std::convertible_to<value_type>;}
-		constexpr result& fmap(F&& f) noexcept(std::is_nothrow_invocable_v<F&&, value_type>) {
-			if (has_val()) {
-				**this = std::invoke(f, **this);
-			}
-
-			return *this;
-		}
-
-		template <typename F> requires requires(F&& f, value_type&& v) {
-			{std::invoke(f, v)} -> result_detail::template_of<result>;
-			requires std::same_as<error_type, typename std::invoke_result_t<F&&, value_type&&>::error_type>;
-		}
-		constexpr std::invoke_result_t<F&&, value_type&&> bind(F&& f) {
-			if (has_val()) {
-				return std::invoke(f, **this);
-			} else {
-				return make_error(std::move(err()));
-			}
-		}
-
 		constexpr error_type& err() & {
 			if (!has_err()) {
 				throw bad_result_access{"missing error"};
@@ -288,6 +267,36 @@ namespace fb {
 			}
 
 			return std::move(std::get<1>(m_value));
+		}
+
+		template <typename F> requires requires(F&& f, value_type&& v) {{std::invoke(f, v)} -> std::convertible_to<value_type>;}
+		constexpr result& fmap(F&& f) noexcept(std::is_nothrow_invocable_v<F&&, value_type>) {
+			if (has_val()) {
+				**this = std::invoke(f, **this);
+			}
+
+			return *this;
+		}
+
+		template <typename F> requires requires(F&& f, value_type&& v) {
+			{std::invoke(f, v)} -> result_detail::template_of<result>;
+			requires std::same_as<error_type, typename std::invoke_result_t<F&&, value_type&&>::error_type>;
+		}
+		constexpr std::invoke_result_t<F&&, value_type&&> bind(F&& f) {
+			if (has_val()) {
+				return std::invoke(f, **this);
+			} else {
+				return make_error(std::move(err()));
+			}
+		}
+
+		template <std::invocable<> F> requires std::convertible_to<std::invoke_result_t<F&&>, value_type>
+		constexpr value_type or_value(F&& f) {
+			if (!has_val()) {
+				return std::invoke(f);
+			} else {
+				return **this;
+			}
 		}
 	};
 }
