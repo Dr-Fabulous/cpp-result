@@ -86,9 +86,7 @@ namespace fb {
 	}
 
 	struct bad_result_access : public std::runtime_error {
-		bad_result_access(char const* what) :
-			std::runtime_error{what}
-		{}
+		using std::runtime_error::runtime_error;
 	};
 
 	template <typename V, typename E>
